@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<editors>
+
+  <editor id="bool">
+    <range uom="2" min="0" max="1" step="1"/>
+  </editor>
+
+  <editor id="watt">
+    <range uom="73" min="0" max="10000" step="1"/>
+  </editor>
+
+  <editor id="percent">
+    <range uom="51" min="0" max="100" step="0.1"/>
+  </editor>
+
+  <editor id="rawdecimal">
+    <range uom="56" min="0" max="10000" step="0.01"/>
+  </editor>
+
+  <editor id="rawint">
+    <range uom="56" min="0" max="65535" step="1"/>
+  </editor>
+
+
+  <editor id="onoff">
+    <range uom="25" subset="0-1" nls="ONOFF"/>
+  </editor>
+
+  <editor id="colorsyncmode">
+    <range uom="25" subset="0-13" nls="CSMODE"/>
+  </editor>
+
+
+  <editor id="connectionstate">
+    <range uom="25" subset="0-1" nls="CONNECTIONSTATE"/>
+  </editor>
+
+  <editor id="programstate">
+    <range uom="25" subset="0-1" nls="PROGRAMSTATE"/>
+  </editor>
+
+</editors>

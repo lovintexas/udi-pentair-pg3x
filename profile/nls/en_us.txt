@@ -1,0 +1,81 @@
+ND-pentairctrl-NAME=Pentair Cloud
+ND-pentairpump-NAME=IntelliFlo3 Pump
+ND-pentairprogram-NAME=Pentair Pump Program
+ND-pentaircolorsync-NAME=Pentair Color Sync
+
+ND-pentairctrl-ICON=GenericCtl
+ND-pentairpump-ICON=GenericCtl
+ND-pentairprogram-ICON=GenericCtl
+ND-pentaircolorsync-ICON=GenericCtl
+
+ST-ST-NAME=Status
+
+ST-GV1-NAME=Power
+ST-GV2-NAME=Speed
+ST-GV3-NAME=Flow (GPM)
+ST-GV4-NAME=Pressure (PSI)
+ST-GV5-NAME=Alarm Code
+ST-GV6-NAME=Active Program
+
+CMD-QUERY-NAME=Query
+CMD-START-NAME=Start
+CMD-STOP-NAME=Stop
+CMD-ON-NAME=On
+CMD-OFF-NAME=Off
+CMD-RED-NAME=Red
+CMD-WHITE-NAME=White
+CMD-MAGENTA-NAME=Magenta
+CMD-GREEN-NAME=Green
+CMD-BLUE-NAME=Blue
+CMD-HOLD-NAME=Hold
+CMD-RECALL-NAME=Recall
+CMD-SAM-NAME=SAm
+CMD-PARTY-NAME=Party
+CMD-ROMANCE-NAME=Romance
+CMD-CARIBBEAN-NAME=Caribbean
+CMD-AMERICAN-NAME=American
+CMD-SUNSET-NAME=Sunset
+CMD-ROYAL-NAME=Royal
+ST-GV1-NAME=Power
+ST-GV2-NAME=Color/Show
+EDITOR-onoff-OFF=Off
+EDITOR-onoff-ON=On
+
+EDITOR-colorsyncmode-RED=Red
+EDITOR-colorsyncmode-WHITE=White
+EDITOR-colorsyncmode-MAGENTA=Magenta
+EDITOR-colorsyncmode-GREEN=Green
+EDITOR-colorsyncmode-BLUE=Blue
+EDITOR-colorsyncmode-HOLD=Hold
+EDITOR-colorsyncmode-RECALL=Recall
+EDITOR-colorsyncmode-SAM=SAm
+EDITOR-colorsyncmode-PARTY=Party
+EDITOR-colorsyncmode-ROMANCE=Romance
+EDITOR-colorsyncmode-CARIBBEAN=Caribbean
+EDITOR-colorsyncmode-AMERICAN=American
+EDITOR-colorsyncmode-SUNSET=Sunset
+EDITOR-colorsyncmode-ROYAL=Royal
+
+ONOFF-0=Off
+ONOFF-1=On
+
+CSMODE-0=Red
+CSMODE-1=White
+CSMODE-2=Magenta
+CSMODE-3=Green
+CSMODE-4=Blue
+CSMODE-5=Hold
+CSMODE-6=Recall
+CSMODE-7=SAm
+CSMODE-8=Party
+CSMODE-9=Romance
+CSMODE-10=Caribbean
+CSMODE-11=American
+CSMODE-12=Sunset
+CSMODE-13=Royal
+
+CONNECTIONSTATE-0=Not Connected
+CONNECTIONSTATE-1=Connected
+
+PROGRAMSTATE-0=Idle
+PROGRAMSTATE-1=Running

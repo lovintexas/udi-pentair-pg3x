@@ -1,0 +1,6 @@
+udi-interface
+markdown2
+requests
+boto3
+pycognito==2022.12.0
+requests-aws4auth==1.2.0

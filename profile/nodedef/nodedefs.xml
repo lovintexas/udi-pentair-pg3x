@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nodeDefs>
+
+  <nodeDef id="pentairctrl" nls="pentairctrl">
+    <sts>
+      <st id="ST" editor="connectionstate"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
+  <nodeDef id="pentairpump" nls="pentairpump">
+    <sts>
+      <st id="ST" editor="connectionstate"/>
+      <st id="GV1" editor="watt"/>
+      <st id="GV2" editor="percent"/>
+      <st id="GV3" editor="rawdecimal"/>
+      <st id="GV4" editor="rawdecimal"/>
+      <st id="GV5" editor="rawint"/>
+      <st id="GV6" editor="rawint"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
+  <nodeDef id="pentairprogram" nls="pentairprogram">
+    <sts>
+      <st id="ST" editor="programstate"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="START"/>
+        <cmd id="STOP"/>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
+  <nodeDef id="pentaircolorsync" nls="pentaircolorsync">
+    <sts>
+      <st id="ST" editor="connectionstate"/>
+      <st id="GV1" editor="onoff"/>
+      <st id="GV2" editor="colorsyncmode"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="ON"/>
+        <cmd id="OFF"/>
+        <cmd id="RED"/>
+        <cmd id="WHITE"/>
+        <cmd id="MAGENTA"/>
+        <cmd id="GREEN"/>
+        <cmd id="BLUE"/>
+        <cmd id="HOLD"/>
+        <cmd id="RECALL"/>
+        <cmd id="SAM"/>
+        <cmd id="PARTY"/>
+        <cmd id="ROMANCE"/>
+        <cmd id="CARIBBEAN"/>
+        <cmd id="AMERICAN"/>
+        <cmd id="SUNSET"/>
+        <cmd id="ROYAL"/>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
+</nodeDefs>

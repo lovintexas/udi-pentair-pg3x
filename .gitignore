@@ -1,0 +1,24 @@
+# PG3x runtime files
+logs/
+*.log
+*.pid
+*.lock
+*.key
+*.cert
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Development backups
+*.before_*
+*.bak
+*~
+
+# Environment / credentials
+.env
+.env.*
+venv/
+.venv/
