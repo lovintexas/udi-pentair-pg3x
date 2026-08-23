@@ -113,25 +113,63 @@ class PentairCloudClient:
 
         LOGGER.info("Pentair Cloud authentication successful")
 
-    def list_devices(self):
-        response = requests.get(
-            PENTAIR_ENDPOINT + PENTAIR_DEVICES_PATH,
-            auth=self.aws_auth,
-            headers=self.headers,
-            timeout=30
+    def _request(self, method, url, **kwargs):
+        """
+        Make an authenticated Pentair Cloud request.
+
+        Pentair's Cognito/AWS credentials expire periodically.  If the API
+        returns 401 or 403, authenticate again and retry the request once.
+        """
+        for attempt in range(2):
+            response = requests.request(
+                method,
+                url,
+                auth=self.aws_auth,
+                headers=self.headers,
+                timeout=30,
+                **kwargs
+            )
+
+            if (
+                response.status_code in (401, 403)
+                and attempt == 0
+            ):
+                LOGGER.warning(
+                    "Pentair Cloud authentication expired "
+                    f"(HTTP {response.status_code}); "
+                    "re-authenticating"
+                )
+
+                if not self.username or not self.password:
+                    response.raise_for_status()
+
+                self.authenticate(
+                    self.username,
+                    self.password
+                )
+
+                continue
+
+            response.raise_for_status()
+            return response
+
+        raise RuntimeError(
+            "Pentair Cloud request failed after re-authentication"
         )
 
-        response.raise_for_status()
+    def list_devices(self):
+        response = self._request(
+            "GET",
+            PENTAIR_ENDPOINT + PENTAIR_DEVICES_PATH
+        )
 
         return response.json().get("data", [])
 
     def put_device_payload(self, device_id, payload):
-        response = requests.put(
+        response = self._request(
+            "PUT",
             PENTAIR_ENDPOINT + PENTAIR_DEVICE_PATH + device_id,
-            auth=self.aws_auth,
-            headers=self.headers,
-            json={"payload": payload},
-            timeout=30
+            json={"payload": payload}
         )
 
         response.raise_for_status()
@@ -206,12 +244,10 @@ class PentairCloudClient:
         if not device_ids:
             return []
 
-        response = requests.post(
+        response = self._request(
+            "POST",
             PENTAIR_ENDPOINT + PENTAIR_DEVICE2_PATH,
-            auth=self.aws_auth,
-            headers=self.headers,
-            json={"deviceIds": device_ids},
-            timeout=30
+            json={"deviceIds": device_ids}
         )
 
         response.raise_for_status()
@@ -470,7 +506,7 @@ class ColorSyncNode(udi_interface.Node):
     drivers = [
         {"driver": "ST",  "value": 0, "uom": 25},
         {"driver": "GV1", "value": 0, "uom": 25},
-        {"driver": "GV2", "value": 0, "uom": 25},
+        {"driver": "GV7", "value": 0, "uom": 25},
     ]
 
     MODES = {
@@ -539,7 +575,7 @@ class ColorSyncNode(udi_interface.Node):
 
         if mode is not None:
             self.setDriver(
-                "GV2",
+                "GV7",
                 int(mode)
             )
 
@@ -584,7 +620,7 @@ class ColorSyncNode(udi_interface.Node):
 
             # Immediately reflect the commanded mode in IoX.
             self.setDriver(
-                "GV2",
+                "GV7",
                 int(mode)
             )
 

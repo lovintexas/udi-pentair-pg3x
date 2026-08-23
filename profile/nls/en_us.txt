@@ -37,7 +37,7 @@ CMD-AMERICAN-NAME=American
 CMD-SUNSET-NAME=Sunset
 CMD-ROYAL-NAME=Royal
 ST-GV1-NAME=Power
-ST-GV2-NAME=Color/Show
+ST-GV7-NAME=Color/Show
 EDITOR-onoff-OFF=Off
 EDITOR-onoff-ON=On
 

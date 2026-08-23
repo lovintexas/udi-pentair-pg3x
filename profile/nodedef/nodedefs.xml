@@ -49,7 +49,7 @@
     <sts>
       <st id="ST" editor="connectionstate"/>
       <st id="GV1" editor="onoff"/>
-      <st id="GV2" editor="colorsyncmode"/>
+      <st id="GV7" editor="colorsyncmode"/>
     </sts>
     <cmds>
       <sends/>
