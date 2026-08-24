@@ -14,6 +14,7 @@ from requests_aws4auth import AWS4Auth
 
 
 LOGGER = udi_interface.LOGGER
+VERSION = "1.0.0"
 
 polyglot = udi_interface.Interface([])
 controller = None
@@ -1090,7 +1091,7 @@ def stop_handler():
 
 if __name__ == "__main__":
     try:
-        polyglot.start()
+        polyglot.start(VERSION)
 
         polyglot.subscribe(
             polyglot.CUSTOMPARAMS,
