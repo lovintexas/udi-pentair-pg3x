@@ -4,6 +4,8 @@ import sys
 import os
 import hashlib
 import threading
+import json
+import uuid
 
 import boto3
 import markdown2
@@ -11,10 +13,11 @@ import requests
 import udi_interface
 from pycognito import Cognito
 from requests_aws4auth import AWS4Auth
+import websocket
 
 
 LOGGER = udi_interface.LOGGER
-VERSION = "1.0.0"
+VERSION = "1.1.0-beta1"
 
 polyglot = udi_interface.Interface([])
 controller = None
@@ -697,6 +700,838 @@ class ColorSyncNode(udi_interface.Node):
     }
 
 
+
+
+class IntelliCenterClient:
+    API_BASE = "https://prod-api.intellicenter.com"
+
+    def __init__(self, cloud_client):
+        self.cloud_client = cloud_client
+        self.access_token = None
+        self.installation = None
+        self.installation_id = None
+        self.ws = None
+        self.ws_lock = threading.RLock()
+
+    def _get_access_token(self):
+        cognito = self.cloud_client.cognito
+
+        if cognito is None:
+            raise RuntimeError(
+                "Pentair Cognito session is not available"
+            )
+
+        user = cognito.get_user()
+
+        token = (
+            getattr(cognito, "access_token", None)
+            or getattr(user, "access_token", None)
+            or (
+                getattr(user, "_metadata", {}) or {}
+            ).get("access_token")
+        )
+
+        if not token:
+            raise RuntimeError(
+                "Could not obtain IntelliCenter access token"
+            )
+
+        self.access_token = token
+        return token
+
+    def find_installations(self):
+        token = self._get_access_token()
+
+        url = (
+            self.API_BASE
+            + "/service/api/installations"
+            + "?pageSize=100&page=1"
+        )
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "access-token": token,
+            "Accept": "application/json",
+        }
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=30
+        )
+
+        response.raise_for_status()
+        data = response.json()
+
+        if isinstance(data, list):
+            installations = data
+        else:
+            installations = (
+                data.get("data")
+                or data.get("installations")
+                or []
+            )
+
+        return installations
+
+    def connect(self, installation=None):
+        with self.ws_lock:
+            if installation is not None:
+                self.installation = installation
+                self.installation_id = installation.get(
+                    "InstallationId"
+                )
+
+            if not self.installation_id:
+                raise RuntimeError(
+                    "IntelliCenter installation has no InstallationId"
+                )
+
+            # Close any stale socket first.
+            if self.ws is not None:
+                try:
+                    self.ws.close()
+                except Exception:
+                    pass
+
+                self.ws = None
+
+            token = self._get_access_token()
+
+            ws_url = (
+                "wss://prod-api.intellicenter.com/client"
+                f"?id={self.installation_id}"
+                f"&access-token={token}"
+            )
+
+            LOGGER.info(
+                f"Connecting IntelliCenter WebSocket "
+                f"for installation {self.installation_id}"
+            )
+
+            self.ws = websocket.create_connection(
+                ws_url,
+                timeout=15
+            )
+
+            LOGGER.info(
+                "IntelliCenter WebSocket connected"
+            )
+
+            return True
+
+    def is_connected(self):
+        ws = self.ws
+
+        if ws is None:
+            return False
+
+        try:
+            return bool(ws.connected)
+        except Exception:
+            return False
+
+    def ensure_connected(self):
+        with self.ws_lock:
+            if self.is_connected():
+                return True
+
+            LOGGER.warning(
+                "IntelliCenter WebSocket is not connected; "
+                "reconnecting"
+            )
+
+            return self.connect()
+
+    def close(self):
+        with self.ws_lock:
+            if self.ws is not None:
+                try:
+                    self.ws.close()
+                except Exception:
+                    pass
+
+            self.ws = None
+
+    def send_json(self, message):
+        data = json.dumps(message)
+
+        for attempt in range(2):
+            try:
+                self.ensure_connected()
+
+                with self.ws_lock:
+                    self.ws.send(data)
+
+                return
+
+            except (
+                websocket.WebSocketConnectionClosedException,
+                BrokenPipeError,
+                OSError
+            ) as err:
+                LOGGER.warning(
+                    f"IntelliCenter WebSocket send failed: "
+                    f"{err}"
+                )
+
+                self.close()
+
+                if attempt == 0:
+                    continue
+
+                raise
+
+        raise RuntimeError(
+            "Unable to send IntelliCenter WebSocket message"
+        )
+
+    def query_objects(self, condition, keys):
+        if self.ws is None:
+            raise RuntimeError(
+                "IntelliCenter WebSocket is not connected"
+            )
+
+        message_id = (
+            "PG3X_QUERY_" + str(uuid.uuid4())
+        )
+
+        query = {
+            "condition": condition,
+            "objectList": [
+                {
+                    "objnam": "ALL",
+                    "keys": keys
+                }
+            ],
+            "command": "GETPARAMLIST",
+            "messageID": message_id
+        }
+
+        self.send_json(query)
+
+        while True:
+            raw = self.ws.recv()
+
+            if not raw:
+                continue
+
+            try:
+                message = json.loads(raw)
+            except Exception:
+                continue
+
+            if message.get("messageID") != message_id:
+                continue
+
+            return message.get("objectList", [])
+
+
+
+
+
+
+
+
+class IntelliCenterLightNode(udi_interface.Node):
+    id = "pentairiclight"
+
+    drivers = [
+        {"driver": "ST", "value": 0, "uom": 25},
+        {"driver": "GV27", "value": 0, "uom": 25},
+    ]
+
+    LIGHT_ACTIONS = {
+        "WHITE": "WHITER",
+        "GREEN": "GREENR",
+        "BLUE": "BLUER",
+        "MAGENTA": "MAGNTAR",
+        "RED": "REDR",
+        "SAM": "SAMMOD",
+        "PARTY": "PARTY",
+        "ROMANCE": "ROMAN",
+        "CARIBBEAN": "CARIB",
+        "AMERICAN": "AMERCA",
+        "SUNSET": "SSET",
+        "ROYAL": "ROYAL",
+        "HOLD": "HOLD",
+        "RECALL": "RECALL",
+    }
+
+    USE_TO_MODE = {
+        "WHITER": 0,
+        "GREENR": 1,
+        "BLUER": 2,
+        "MAGNTAR": 3,
+        "REDR": 4,
+        "SAMMOD": 5,
+        "PARTY": 6,
+        "ROMAN": 7,
+        "CARIB": 8,
+        "AMERCA": 9,
+        "SSET": 10,
+        "ROYAL": 11,
+        "12": 12,
+        "13": 13,
+        "HOLD": 12,
+        "RECALL": 13,
+    }
+
+    def __init__(
+        self,
+        polyglot,
+        primary,
+        address,
+        name,
+        controller,
+        objnam
+    ):
+        super().__init__(
+            polyglot,
+            primary,
+            address,
+            name
+        )
+
+        self.controller = controller
+        self.objnam = objnam
+        self.params = {}
+
+    def update_from_params(self, params):
+        if not params:
+            return
+
+        self.params.update(params)
+
+        status = self.params.get("STATUS")
+
+        if status is not None:
+            self.setDriver(
+                "ST",
+                1 if str(status).upper() == "ON" else 0
+            )
+
+        # LIMIT is the cleanest readback: IntelliCenter reports
+        # 0-11 for colors/shows, 12 for Hold and 13 for Recall.
+        limit = self.params.get("LIMIT")
+
+        if limit is not None:
+            try:
+                value = int(limit)
+
+                if 0 <= value <= 13:
+                    self.setDriver("GV27", value)
+                    return
+            except Exception:
+                pass
+
+        # USE provides the textual readback and is useful if
+        # LIMIT is absent from a partial NotifyList.
+        use = self.params.get("USE")
+
+        if use is not None:
+            mode = self.USE_TO_MODE.get(
+                str(use).upper()
+            )
+
+            if mode is not None:
+                self.setDriver("GV27", mode)
+
+    def query(self, command=None):
+        self.controller.query_intellicenter_object(
+            self.objnam
+        )
+
+    def cmd_on(self, command=None):
+        self.controller.set_intellicenter_param(
+            self.objnam,
+            "STATUS",
+            "ON"
+        )
+
+    def cmd_off(self, command=None):
+        self.controller.set_intellicenter_param(
+            self.objnam,
+            "STATUS",
+            "OFF"
+        )
+
+    def set_light_action(self, action):
+        code = self.LIGHT_ACTIONS[action]
+
+        self.controller.set_intellicenter_params(
+            self.objnam,
+            {
+                "ACT": code,
+                "STATUS": "ON",
+            }
+        )
+
+    def cmd_white(self, command=None):
+        self.set_light_action("WHITE")
+
+    def cmd_green(self, command=None):
+        self.set_light_action("GREEN")
+
+    def cmd_blue(self, command=None):
+        self.set_light_action("BLUE")
+
+    def cmd_magenta(self, command=None):
+        self.set_light_action("MAGENTA")
+
+    def cmd_red(self, command=None):
+        self.set_light_action("RED")
+
+    def cmd_sam(self, command=None):
+        self.set_light_action("SAM")
+
+    def cmd_party(self, command=None):
+        self.set_light_action("PARTY")
+
+    def cmd_romance(self, command=None):
+        self.set_light_action("ROMANCE")
+
+    def cmd_caribbean(self, command=None):
+        self.set_light_action("CARIBBEAN")
+
+    def cmd_american(self, command=None):
+        self.set_light_action("AMERICAN")
+
+    def cmd_sunset(self, command=None):
+        self.set_light_action("SUNSET")
+
+    def cmd_royal(self, command=None):
+        self.set_light_action("ROYAL")
+
+    def cmd_hold(self, command=None):
+        self.set_light_action("HOLD")
+
+    def cmd_recall(self, command=None):
+        self.set_light_action("RECALL")
+
+    commands = {
+        "QUERY": query,
+        "ON": cmd_on,
+        "OFF": cmd_off,
+        "WHITE": cmd_white,
+        "GREEN": cmd_green,
+        "BLUE": cmd_blue,
+        "MAGENTA": cmd_magenta,
+        "RED": cmd_red,
+        "SAM": cmd_sam,
+        "PARTY": cmd_party,
+        "ROMANCE": cmd_romance,
+        "CARIBBEAN": cmd_caribbean,
+        "AMERICAN": cmd_american,
+        "SUNSET": cmd_sunset,
+        "ROYAL": cmd_royal,
+        "HOLD": cmd_hold,
+        "RECALL": cmd_recall,
+    }
+
+
+class IntelliCenterCircuitNode(udi_interface.Node):
+    id = "pentairiccircuit"
+
+    drivers = [
+        {"driver": "ST", "value": 0, "uom": 25},
+    ]
+
+    def __init__(
+        self,
+        polyglot,
+        primary,
+        address,
+        name,
+        controller,
+        objnam
+    ):
+        super().__init__(
+            polyglot,
+            primary,
+            address,
+            name
+        )
+
+        self.controller = controller
+        self.objnam = objnam
+        self.params = {}
+
+    def update_from_params(self, params):
+        if not params:
+            return
+
+        self.params.update(params)
+
+        status = self.params.get("STATUS")
+
+        if status is not None:
+            self.setDriver(
+                "ST",
+                1 if str(status).upper() == "ON" else 0
+            )
+
+    def query(self, command=None):
+        self.controller.query_intellicenter_object(
+            self.objnam
+        )
+
+    def cmd_on(self, command=None):
+        self.controller.set_intellicenter_param(
+            self.objnam,
+            "STATUS",
+            "ON"
+        )
+
+    def cmd_off(self, command=None):
+        self.controller.set_intellicenter_param(
+            self.objnam,
+            "STATUS",
+            "OFF"
+        )
+
+    commands = {
+        "QUERY": query,
+        "ON": cmd_on,
+        "OFF": cmd_off,
+    }
+
+
+class IntelliCenterChemNode(udi_interface.Node):
+    id = "pentairicchem"
+
+    drivers = [
+        {"driver": "ST", "value": 1, "uom": 25},
+        {"driver": "GV12", "value": 0, "uom": 56},
+        {"driver": "GV13", "value": 0, "uom": 56},
+        {"driver": "GV14", "value": 0, "uom": 56},
+        {"driver": "GV15", "value": 0, "uom": 56},
+        {"driver": "GV16", "value": 0, "uom": 56},
+        {"driver": "GV17", "value": 0, "uom": 56},
+        {"driver": "GV18", "value": 0, "uom": 56},
+        {"driver": "GV19", "value": 0, "uom": 56},
+    ]
+
+    def __init__(self, polyglot, primary, address, name, controller, objnam):
+        super().__init__(polyglot, primary, address, name)
+        self.controller = controller
+        self.objnam = objnam
+        self.params = {}
+
+    def update_from_params(self, params):
+        if not params:
+            return
+
+        self.params.update(params)
+        self.setDriver("ST", 1)
+
+        mapping = (
+            ("PHVAL", "GV12"),
+            ("ORPVAL", "GV13"),
+            ("SALT", "GV14"),
+            ("ALK", "GV15"),
+            ("CALC", "GV16"),
+            ("CYACID", "GV17"),
+            ("PHSET", "GV18"),
+            ("ORPSET", "GV19"),
+        )
+
+        for key, driver in mapping:
+            value = self.params.get(key)
+            if value is None:
+                continue
+            try:
+                self.setDriver(driver, float(value))
+            except Exception:
+                pass
+
+    def query(self, command=None):
+        self.controller.query_intellicenter_object(self.objnam)
+
+    commands = {"QUERY": query}
+
+
+class IntelliCenterChlorNode(udi_interface.Node):
+    id = "pentairicchlor"
+
+    drivers = [
+        {"driver": "ST", "value": 1, "uom": 25},
+        {"driver": "GV20", "value": 0, "uom": 56},
+        {"driver": "GV21", "value": 0, "uom": 51},
+        {"driver": "GV22", "value": 0, "uom": 51},
+        {"driver": "GV23", "value": 0, "uom": 25},
+    ]
+
+    def __init__(self, polyglot, primary, address, name, controller, objnam):
+        super().__init__(polyglot, primary, address, name)
+        self.controller = controller
+        self.objnam = objnam
+        self.params = {}
+
+    def update_from_params(self, params):
+        if not params:
+            return
+
+        self.params.update(params)
+        self.setDriver("ST", 1)
+
+        for key, driver in (
+            ("SALT", "GV20"),
+            ("PRIM", "GV21"),
+            ("SEC", "GV22"),
+        ):
+            value = self.params.get(key)
+            if value is None:
+                continue
+            try:
+                self.setDriver(driver, float(value))
+            except Exception:
+                pass
+
+        super_value = self.params.get("SUPER")
+        if super_value is not None:
+            self.setDriver(
+                "GV23",
+                1 if str(super_value).upper() == "ON" else 0
+            )
+
+    def query(self, command=None):
+        self.controller.query_intellicenter_object(self.objnam)
+
+    commands = {"QUERY": query}
+
+
+class IntelliCenterHeaterNode(udi_interface.Node):
+    id = "pentairicheater"
+
+    drivers = [
+        {"driver": "ST", "value": 0, "uom": 25},
+        {"driver": "GV24", "value": 0, "uom": 25},
+        {"driver": "GV25", "value": 0, "uom": 25},
+        {"driver": "GV26", "value": 0, "uom": 25},
+    ]
+
+    def __init__(
+        self,
+        polyglot,
+        primary,
+        address,
+        name,
+        controller,
+        objnam
+    ):
+        super().__init__(
+            polyglot,
+            primary,
+            address,
+            name
+        )
+
+        self.controller = controller
+        self.objnam = objnam
+        self.params = {}
+
+    @staticmethod
+    def _on(value):
+        return 1 if str(value).upper() in (
+            "ON",
+            "HEATING",
+            "COOLING",
+            "READY"
+        ) else 0
+
+    def update_from_params(self, params):
+        if not params:
+            return
+
+        self.params.update(params)
+
+        mapping = (
+            ("STATUS", "ST"),
+            ("READY", "GV24"),
+            ("HEATING", "GV25"),
+            ("COOL", "GV26"),
+        )
+
+        for key, driver in mapping:
+            if key in self.params:
+                self.setDriver(
+                    driver,
+                    self._on(self.params[key])
+                )
+
+    def query(self, command=None):
+        self.controller.query_intellicenter_object(
+            self.objnam
+        )
+
+    commands = {
+        "QUERY": query,
+    }
+
+
+
+class IntelliCenterBodyNode(udi_interface.Node):
+    id = "pentairicbody"
+
+    drivers = [
+        {"driver": "ST", "value": 0, "uom": 25},
+        {"driver": "CLITEMP", "value": 0, "uom": 17},
+        {"driver": "GV11", "value": 0, "uom": 56},
+    ]
+
+    def __init__(
+        self,
+        polyglot,
+        primary,
+        address,
+        name,
+        controller,
+        objnam
+    ):
+        super().__init__(
+            polyglot,
+            primary,
+            address,
+            name
+        )
+
+        self.controller = controller
+        self.objnam = objnam
+        self.params = {}
+
+    def update_from_params(self, params):
+        if not params:
+            return
+
+        self.params.update(params)
+
+        status = self.params.get("STATUS")
+        if status is not None:
+            self.setDriver(
+                "ST",
+                1 if str(status).upper() == "ON" else 0
+            )
+
+        value = self.params.get("TEMP")
+
+        if value is not None:
+            try:
+                self.setDriver("CLITEMP", float(value))
+            except Exception:
+                pass
+
+        htmode = self.params.get("HTMODE")
+        if htmode is not None:
+            try:
+                self.setDriver("GV11", int(htmode))
+            except Exception:
+                pass
+
+    def query(self, command=None):
+        self.controller.query_intellicenter_object(
+            self.objnam
+        )
+
+    def cmd_on(self, command=None):
+        self.controller.set_intellicenter_param(
+            self.objnam,
+            "STATUS",
+            "ON"
+        )
+
+    def cmd_off(self, command=None):
+        self.controller.set_intellicenter_param(
+            self.objnam,
+            "STATUS",
+            "OFF"
+        )
+
+    commands = {
+        "QUERY": query,
+        "ON": cmd_on,
+        "OFF": cmd_off,
+    }
+
+
+class IntelliCenterPumpNode(udi_interface.Node):
+    id = "pentairicpump"
+
+    drivers = [
+        {"driver": "ST", "value": 0, "uom": 25},
+        {"driver": "GV1", "value": 0, "uom": 73},
+        {"driver": "GV8", "value": 0, "uom": 56},
+        {"driver": "GV3", "value": 0, "uom": 56},
+    ]
+
+    def __init__(
+        self,
+        polyglot,
+        primary,
+        address,
+        name,
+        controller,
+        objnam
+    ):
+        super().__init__(
+            polyglot,
+            primary,
+            address,
+            name
+        )
+
+        self.controller = controller
+        self.objnam = objnam
+        self.params = {}
+
+    def update_from_params(self, params):
+        if not params:
+            return
+
+        self.params.update(params)
+
+        rpm = self.params.get("RPM")
+        gpm = self.params.get("GPM")
+        pwr = self.params.get("PWR")
+
+        try:
+            rpm_num = int(float(rpm))
+        except Exception:
+            rpm_num = 0
+
+        self.setDriver(
+            "ST",
+            1 if rpm_num > 0 else 0
+        )
+
+        if pwr is not None:
+            try:
+                self.setDriver("GV1", float(pwr))
+            except Exception:
+                pass
+
+        if rpm is not None:
+            try:
+                self.setDriver("GV8", float(rpm))
+            except Exception:
+                pass
+
+        if gpm is not None:
+            try:
+                self.setDriver("GV3", float(gpm))
+            except Exception:
+                pass
+
+    def query(self, command=None):
+        self.controller.query_intellicenter_object(
+            self.objnam
+        )
+
+    commands = {
+        "QUERY": query,
+    }
+
+
 class Controller(udi_interface.Node):
     id = "pentairctrl"
 
@@ -719,12 +1554,26 @@ class Controller(udi_interface.Node):
         )
 
         self.client = PentairCloudClient()
+        self.intellicenter = IntelliCenterClient(
+            self.client
+        )
 
         self.username = None
         self.password = None
 
         self.pumps = {}
         self.colorsyncs = {}
+
+        self.ic_bodies = {}
+        self.ic_pumps = {}
+        self.ic_heaters = {}
+        self.ic_chem = {}
+        self.ic_chlor = {}
+        self.ic_circuits = {}
+        self.ic_lights = {}
+
+        self.ic_listener_thread = None
+        self.ic_listener_stop = threading.Event()
 
     def configure(self, params):
         self.username = params.get("username")
@@ -771,6 +1620,9 @@ class Controller(udi_interface.Node):
             f"{len(devices)} device(s)"
         )
 
+        if not devices:
+            self.discover_intellicenter()
+
         for device in devices:
 
             device_type = device.get(
@@ -815,6 +1667,696 @@ class Controller(udi_interface.Node):
                     f"name={nickname}, "
                     f"product={device.get('pname')}"
                 )
+
+    def add_ic_circuit(self, obj):
+        objnam = str(obj.get("objnam", "")).strip()
+        params = obj.get("params", {}) or {}
+
+        if not objnam:
+            return
+
+        name = str(
+            params.get("SNAME", "")
+        ).strip()
+
+        subtype = str(
+            params.get("SUBTYP", "")
+        ).upper()
+
+        # Ignore unnamed objects.
+        if not name:
+            return
+
+        # IntelliCenter color lights use the same CIRCUIT
+        # object type but SUBTYP=INTELLI.  Give them the
+        # dedicated color/show node instead of a generic
+        # On/Off circuit.
+        if subtype == "INTELLI":
+            address = make_address(
+                "l",
+                "intellicenter:" + objnam
+            )
+
+            node = self.ic_lights.get(address)
+
+            if node is None:
+                node = IntelliCenterLightNode(
+                    polyglot,
+                    self.address,
+                    address,
+                    name,
+                    self,
+                    objnam
+                )
+
+                self.ic_lights[address] = node
+                polyglot.addNode(node)
+
+                LOGGER.info(
+                    f"Added IntelliCenter color light node: "
+                    f"{name} ({objnam})"
+                )
+
+            node.update_from_params(params)
+            return
+
+        # IntelliCenter creates many internal helper objects
+        # beginning with X or _.  These are not normal
+        # user-facing circuits.
+        if objnam.upper().startswith(("X", "_")):
+            return
+
+        # Pool and Spa filter circuits are already represented
+        # by the BODY nodes.
+        if subtype in ("POOL", "SPA"):
+            return
+
+        # Default unassigned AUX names are generally placeholders.
+        # If we later identify a reliable "assigned" flag, we can
+        # refine this rule.
+        upper_name = name.upper()
+
+        if upper_name.startswith("AUX "):
+            suffix = upper_name[4:].strip()
+
+            if suffix.isdigit():
+                LOGGER.debug(
+                    f"Skipping default AUX circuit "
+                    f"{objnam}: {name}"
+                )
+                return
+
+        address = make_address(
+            "c",
+            "intellicenter:" + objnam
+        )
+
+        node = self.ic_circuits.get(address)
+
+        if node is None:
+            node = IntelliCenterCircuitNode(
+                polyglot,
+                self.address,
+                address,
+                name,
+                self,
+                objnam
+            )
+
+            self.ic_circuits[address] = node
+            polyglot.addNode(node)
+
+            LOGGER.info(
+                f"Added IntelliCenter circuit node: "
+                f"{name} ({objnam}, {subtype})"
+            )
+
+        node.update_from_params(params)
+
+    def add_ic_chem(self, obj):
+        objnam = obj.get("objnam")
+        params = obj.get("params", {}) or {}
+
+        if not objnam:
+            return
+
+        subtype = str(params.get("SUBTYP", "")).upper()
+
+        if subtype == "ICHEM":
+            address = make_address("m", "intellicenter:" + objnam)
+
+            node = self.ic_chem.get(address)
+
+            if node is None:
+                name = params.get("SNAME") or "IntelliChem"
+
+                node = IntelliCenterChemNode(
+                    polyglot,
+                    self.address,
+                    address,
+                    name,
+                    self,
+                    objnam
+                )
+
+                self.ic_chem[address] = node
+                polyglot.addNode(node)
+
+                LOGGER.info(
+                    f"Added IntelliChem node: {name} ({objnam})"
+                )
+
+            node.update_from_params(params)
+
+        elif subtype == "ICHLOR":
+            address = make_address("r", "intellicenter:" + objnam)
+
+            node = self.ic_chlor.get(address)
+
+            if node is None:
+                name = params.get("SNAME") or "IntelliChlor"
+
+                node = IntelliCenterChlorNode(
+                    polyglot,
+                    self.address,
+                    address,
+                    name,
+                    self,
+                    objnam
+                )
+
+                self.ic_chlor[address] = node
+                polyglot.addNode(node)
+
+                LOGGER.info(
+                    f"Added IntelliChlor node: {name} ({objnam})"
+                )
+
+            node.update_from_params(params)
+
+    def add_ic_heater(self, obj):
+        objnam = obj.get("objnam")
+        params = obj.get("params", {}) or {}
+
+        if not objnam:
+            return
+
+        address = make_address(
+            "h",
+            "intellicenter:" + objnam
+        )
+
+        node = self.ic_heaters.get(address)
+
+        if node is None:
+            name = (
+                params.get("SNAME")
+                or objnam
+            )
+
+            node = IntelliCenterHeaterNode(
+                polyglot,
+                self.address,
+                address,
+                name,
+                self,
+                objnam
+            )
+
+            self.ic_heaters[address] = node
+            polyglot.addNode(node)
+
+            LOGGER.info(
+                f"Added IntelliCenter heater node: "
+                f"{name} ({objnam})"
+            )
+
+        node.update_from_params(params)
+
+    def add_ic_body(self, obj):
+        objnam = obj.get("objnam")
+        params = obj.get("params", {}) or {}
+
+        if not objnam:
+            return
+
+        address = make_address(
+            "b",
+            "intellicenter:" + objnam
+        )
+
+        node = self.ic_bodies.get(address)
+
+        if node is None:
+            subtype = str(
+                params.get("SUBTYP", "")
+            ).upper()
+
+            if subtype == "POOL":
+                name = "Pool"
+            elif subtype == "SPA":
+                name = "Spa"
+            else:
+                name = (
+                    params.get("SNAME")
+                    or params.get("SUBTYP")
+                    or objnam
+                )
+
+            node = IntelliCenterBodyNode(
+                polyglot,
+                self.address,
+                address,
+                name,
+                self,
+                objnam
+            )
+
+            self.ic_bodies[address] = node
+            polyglot.addNode(node)
+
+            LOGGER.info(
+                f"Added IntelliCenter body node: "
+                f"{name} ({objnam})"
+            )
+
+        node.update_from_params(params)
+
+    def add_ic_pump(self, obj):
+        objnam = obj.get("objnam")
+        params = obj.get("params", {}) or {}
+
+        if not objnam:
+            return
+
+        address = make_address(
+            "i",
+            "intellicenter:" + objnam
+        )
+
+        node = self.ic_pumps.get(address)
+
+        if node is None:
+            name = (
+                params.get("SNAME")
+                or params.get("SUBTYP")
+                or objnam
+            )
+
+            node = IntelliCenterPumpNode(
+                polyglot,
+                self.address,
+                address,
+                name,
+                self,
+                objnam
+            )
+
+            self.ic_pumps[address] = node
+            polyglot.addNode(node)
+
+            LOGGER.info(
+                f"Added IntelliCenter pump node: "
+                f"{name} ({objnam})"
+            )
+
+        node.update_from_params(params)
+
+    def get_ic_node_by_objnam(self, objnam):
+        for node in self.ic_bodies.values():
+            if node.objnam == objnam:
+                return node
+
+        for node in self.ic_pumps.values():
+            if node.objnam == objnam:
+                return node
+
+        for node in self.ic_heaters.values():
+            if node.objnam == objnam:
+                return node
+
+        for node in self.ic_chem.values():
+            if node.objnam == objnam:
+                return node
+
+        for node in self.ic_chlor.values():
+            if node.objnam == objnam:
+                return node
+
+        for node in self.ic_circuits.values():
+            if node.objnam == objnam:
+                return node
+
+        for node in self.ic_lights.values():
+            if node.objnam == objnam:
+                return node
+
+        return None
+
+    def query_intellicenter_object(self, objnam):
+        if self.intellicenter.ws is None:
+            return
+
+        message_id = (
+            "PG3X_OBJECT_" + str(uuid.uuid4())
+        )
+
+        query = {
+            "condition": "",
+            "objectList": [
+                {
+                    "objnam": objnam,
+                    "keys": [
+                        "OBJNAM",
+                        "OBJTYP",
+                        "SUBTYP",
+                        "SNAME",
+                        "STATUS",
+                        "TEMP",
+                        "LOTMP",
+                        "HITMP",
+                        "HTMODE",
+                        "RPM",
+                        "GPM",
+                        "PWR"
+                    ]
+                }
+            ],
+            "command": "REQUESTPARAMLIST",
+            "messageID": message_id
+        }
+
+        self.intellicenter.send_json(
+            query
+        )
+
+    def set_intellicenter_params(
+        self,
+        objnam,
+        params
+    ):
+        if not isinstance(params, dict) or not params:
+            raise ValueError(
+                "IntelliCenter params must be a non-empty dict"
+            )
+
+        message = {
+            "command": "SetParamList",
+            "objectList": [
+                {
+                    "objnam": objnam,
+                    "params": params
+                }
+            ],
+            "messageID": (
+                "PG3X_SET_" + str(uuid.uuid4())
+            )
+        }
+
+        LOGGER.info(
+            f"IntelliCenter command: "
+            f"{objnam} {params}"
+        )
+
+        self.intellicenter.send_json(
+            message
+        )
+
+    def set_intellicenter_param(
+        self,
+        objnam,
+        key,
+        value
+    ):
+        self.set_intellicenter_params(
+            objnam,
+            {
+                key: value
+            }
+        )
+
+
+    def handle_intellicenter_message(self, message):
+        if message.get("command") != "NotifyList":
+            return
+
+        for obj in message.get("objectList", []):
+            objnam = obj.get("objnam")
+            params = obj.get("params", {}) or {}
+
+            if not objnam or not params:
+                continue
+
+            node = self.get_ic_node_by_objnam(
+                objnam
+            )
+
+            if node is not None:
+                LOGGER.debug(
+                    f"IntelliCenter update "
+                    f"{objnam}: {params}"
+                )
+
+                node.update_from_params(
+                    params
+                )
+
+    def intellicenter_listener(self):
+        LOGGER.info(
+            "IntelliCenter listener started"
+        )
+
+        while not self.ic_listener_stop.is_set():
+
+            try:
+                self.intellicenter.ensure_connected()
+
+                ws = self.intellicenter.ws
+
+                # Periodically return from recv so we can
+                # notice plugin shutdown.
+                ws.settimeout(5)
+
+                raw = ws.recv()
+
+                if not raw:
+                    continue
+
+                try:
+                    message = json.loads(raw)
+                except Exception:
+                    continue
+
+                self.handle_intellicenter_message(
+                    message
+                )
+
+            except websocket.WebSocketTimeoutException:
+                continue
+
+            except (
+                websocket.WebSocketConnectionClosedException,
+                BrokenPipeError,
+                OSError
+            ) as err:
+                LOGGER.warning(
+                    f"IntelliCenter WebSocket connection lost: "
+                    f"{err}"
+                )
+
+                self.intellicenter.close()
+
+                if not self.ic_listener_stop.wait(2):
+                    LOGGER.info(
+                        "Attempting IntelliCenter "
+                        "WebSocket reconnect"
+                    )
+
+                continue
+
+            except Exception as err:
+                LOGGER.error(
+                    f"IntelliCenter listener error: {err}"
+                )
+
+                self.intellicenter.close()
+
+                if not self.ic_listener_stop.wait(5):
+                    LOGGER.info(
+                        "Attempting IntelliCenter "
+                        "WebSocket reconnect"
+                    )
+
+                continue
+
+        LOGGER.info(
+            "IntelliCenter listener stopped"
+        )
+
+    def start_intellicenter_listener(self):
+        if (
+            self.ic_listener_thread is not None
+            and self.ic_listener_thread.is_alive()
+        ):
+            return
+
+        self.ic_listener_stop.clear()
+
+        # A short timeout lets the listener periodically
+        # check whether it has been asked to stop.
+        if self.intellicenter.ws is not None:
+            self.intellicenter.ws.settimeout(5)
+
+        self.ic_listener_thread = threading.Thread(
+            target=self.intellicenter_listener,
+            name="IntelliCenterListener",
+            daemon=True
+        )
+
+        self.ic_listener_thread.start()
+
+    def discover_intellicenter(self):
+        LOGGER.info(
+            "Checking for IntelliCenter installations"
+        )
+
+        installations = (
+            self.intellicenter.find_installations()
+        )
+
+        LOGGER.info(
+            f"Pentair account returned "
+            f"{len(installations)} IntelliCenter "
+            f"installation(s)"
+        )
+
+        if not installations:
+            return
+
+        for installation in installations:
+            installation_id = installation.get(
+                "InstallationId"
+            )
+
+            name = (
+                installation.get("PoolName")
+                or installation.get("Name")
+                or f"Installation {installation_id}"
+            )
+
+            LOGGER.info(
+                f"IntelliCenter installation found: "
+                f"{name} ({installation_id})"
+            )
+
+        # First implementation supports the first installation.
+        installation = installations[0]
+
+        self.intellicenter.connect(
+            installation
+        )
+
+        LOGGER.info(
+            "IntelliCenter WebSocket connected"
+        )
+
+        queries = [
+            (
+                "PUMP",
+                "OBJTYP = PUMP",
+                [
+                    "OBJNAM", "OBJTYP", "SUBTYP",
+                    "SNAME", "CIRCUIT", "RPM",
+                    "GPM", "PWR", "STATUS"
+                ]
+            ),
+            (
+                "PMPCIRC",
+                "OBJTYP=PMPCIRC",
+                [
+                    "OBJNAM", "OBJTYP", "BODY",
+                    "CIRCUIT", "SPEED", "SELECT"
+                ]
+            ),
+            (
+                "CIRCUIT",
+                "OBJTYP = CIRCUIT",
+                [
+                    "OBJNAM", "OBJTYP", "SUBTYP",
+                    "SNAME", "STATUS", "USAGE",
+                    "USE"
+                ]
+            ),
+            (
+                "BODY",
+                "OBJTYP = BODY",
+                [
+                    "OBJNAM", "OBJTYP", "SUBTYP",
+                    "SNAME", "STATUS", "TEMP",
+                    "FILTER", "HEATER", "HTSRC",
+                    "HTMODE"
+                ]
+            ),
+            (
+                "HEATER",
+                "OBJTYP = HEATER",
+                [
+                    "OBJNAM", "OBJTYP", "SUBTYP",
+                    "SNAME", "BODY", "STATUS",
+                    "READY", "HEATING", "COOL",
+                    "MODE"
+                ]
+            ),
+            (
+                "SENSE",
+                "OBJTYP = SENSE",
+                [
+                    "OBJNAM", "OBJTYP", "SNAME",
+                    "SOURCE", "PROBE", "CALIB",
+                    "STATUS"
+                ]
+            ),
+            (
+                "CHEM",
+                "OBJTYP = CHEM",
+                [
+                    "OBJNAM", "OBJTYP", "SUBTYP",
+                    "SNAME", "PHVAL", "ORPVAL",
+                    "SALT", "ALK", "CALC",
+                    "CYACID", "PHSET", "ORPSET",
+                    "PRIM", "SEC", "SUPER"
+                ]
+            ),
+        ]
+
+        for label, condition, keys in queries:
+            try:
+                objects = (
+                    self.intellicenter.query_objects(
+                        condition,
+                        keys
+                    )
+                )
+
+                LOGGER.info(
+                    f"IntelliCenter {label}: "
+                    f"{len(objects)} object(s)"
+                )
+
+                for obj in objects:
+                    LOGGER.info(
+                        f"IntelliCenter {label} object: "
+                        f"{obj.get('objnam')} "
+                        f"{obj.get('params', {})}"
+                    )
+
+                    if label == "BODY":
+                        self.add_ic_body(obj)
+
+                    elif label == "PUMP":
+                        self.add_ic_pump(obj)
+
+                    elif label == "HEATER":
+                        self.add_ic_heater(obj)
+
+                    elif label == "CHEM":
+                        self.add_ic_chem(obj)
+
+                    elif label == "CIRCUIT":
+                        self.add_ic_circuit(obj)
+
+            except Exception as err:
+                LOGGER.error(
+                    f"IntelliCenter {label} discovery "
+                    f"failed: {err}"
+                )
+
+        self.start_intellicenter_listener()
+
+        LOGGER.info(
+            "IntelliCenter discovery complete; "
+            "live listener running"
+        )
 
     def add_pump(
         self,

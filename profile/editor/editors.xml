@@ -39,4 +39,14 @@
     <range uom="25" subset="0-1" nls="PROGRAMSTATE"/>
   </editor>
 
+
+  <editor id="tempf">
+    <range uom="17" min="-50" max="150" step="0.1"/>
+  </editor>
+
+
+  <editor id="iclightmode">
+    <range uom="25" subset="0-13" nls="ICLIGHTMODE"/>
+  </editor>
+
 </editors>

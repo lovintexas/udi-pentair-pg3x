@@ -79,3 +79,67 @@ CONNECTIONSTATE-1=Connected
 
 PROGRAMSTATE-0=Idle
 PROGRAMSTATE-1=Running
+
+
+ND-pentairicbody-NAME=IntelliCenter Pool/Spa
+ND-pentairicpump-NAME=IntelliCenter VSF Pump
+
+ND-pentairicbody-ICON=GenericCtl
+ND-pentairicpump-ICON=GenericCtl
+
+ST-CLITEMP-NAME=Temperature
+ST-GV8-NAME=Speed (RPM)
+ST-GV11-NAME=Heat Mode
+
+
+ND-pentairicheater-NAME=IntelliCenter Heater
+ND-pentairicheater-ICON=GenericCtl
+
+
+
+ND-pentairicchem-NAME=IntelliChem
+ND-pentairicchlor-NAME=IntelliChlor
+
+ND-pentairicchem-ICON=GenericCtl
+ND-pentairicchlor-ICON=GenericCtl
+
+ST-GV12-NAME=pH
+ST-GV13-NAME=ORP
+ST-GV14-NAME=Salt
+ST-GV15-NAME=Alkalinity
+ST-GV16-NAME=Calcium
+ST-GV17-NAME=CYA
+ST-GV18-NAME=pH Setpoint
+ST-GV19-NAME=ORP Setpoint
+ST-GV20-NAME=Salt
+ST-GV21-NAME=Pool Output
+ST-GV22-NAME=Spa Output
+ST-GV23-NAME=Super Chlorinate
+ST-GV24-NAME=Ready
+ST-GV25-NAME=Heating
+ST-GV26-NAME=Cooling
+
+
+ND-pentairiccircuit-NAME=IntelliCenter Circuit
+ND-pentairiccircuit-ICON=GenericCtl
+
+
+ND-pentairiclight-NAME=IntelliCenter Color Light
+ND-pentairiclight-ICON=GenericCtl
+
+ST-GV27-NAME=Color/Show
+
+ICLIGHTMODE-0=White
+ICLIGHTMODE-1=Green
+ICLIGHTMODE-2=Blue
+ICLIGHTMODE-3=Magenta
+ICLIGHTMODE-4=Red
+ICLIGHTMODE-5=SAm
+ICLIGHTMODE-6=Party
+ICLIGHTMODE-7=Romance
+ICLIGHTMODE-8=Caribbean
+ICLIGHTMODE-9=American
+ICLIGHTMODE-10=Sunset
+ICLIGHTMODE-11=Royal
+ICLIGHTMODE-12=Hold
+ICLIGHTMODE-13=Recall

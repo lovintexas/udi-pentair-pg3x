@@ -75,4 +75,134 @@
     </cmds>
   </nodeDef>
 
+
+  <nodeDef id="pentairicbody" nls="pentairicbody">
+    <sts>
+      <st id="ST" editor="onoff"/>
+      <st id="CLITEMP" editor="tempf"/>
+      <st id="GV11" editor="rawint"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="ON"/>
+        <cmd id="OFF"/>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
+  <nodeDef id="pentairicpump" nls="pentairicpump">
+    <sts>
+      <st id="ST" editor="onoff"/>
+      <st id="GV1" editor="watt"/>
+      <st id="GV8" editor="rawint"/>
+      <st id="GV3" editor="rawdecimal"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
+
+  <nodeDef id="pentairicheater" nls="pentairicheater">
+    <sts>
+      <st id="ST" editor="onoff"/>
+      <st id="GV24" editor="onoff"/>
+      <st id="GV25" editor="onoff"/>
+      <st id="GV26" editor="onoff"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
+
+  <nodeDef id="pentairicchem" nls="pentairicchem">
+    <sts>
+      <st id="ST" editor="onoff"/>
+      <st id="GV12" editor="rawdecimal"/>
+      <st id="GV13" editor="rawdecimal"/>
+      <st id="GV14" editor="rawint"/>
+      <st id="GV15" editor="rawint"/>
+      <st id="GV16" editor="rawint"/>
+      <st id="GV17" editor="rawint"/>
+      <st id="GV18" editor="rawdecimal"/>
+      <st id="GV19" editor="rawint"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
+  <nodeDef id="pentairicchlor" nls="pentairicchlor">
+    <sts>
+      <st id="ST" editor="onoff"/>
+      <st id="GV20" editor="rawint"/>
+      <st id="GV21" editor="percent"/>
+      <st id="GV22" editor="percent"/>
+      <st id="GV23" editor="onoff"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
+
+  <nodeDef id="pentairiccircuit" nls="pentairiccircuit">
+    <sts>
+      <st id="ST" editor="onoff"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="ON"/>
+        <cmd id="OFF"/>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
+
+  <nodeDef id="pentairiclight" nls="pentairiclight">
+    <sts>
+      <st id="ST" editor="onoff"/>
+      <st id="GV27" editor="iclightmode"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="ON"/>
+        <cmd id="OFF"/>
+        <cmd id="WHITE"/>
+        <cmd id="GREEN"/>
+        <cmd id="BLUE"/>
+        <cmd id="MAGENTA"/>
+        <cmd id="RED"/>
+        <cmd id="SAM"/>
+        <cmd id="PARTY"/>
+        <cmd id="ROMANCE"/>
+        <cmd id="CARIBBEAN"/>
+        <cmd id="AMERICAN"/>
+        <cmd id="SUNSET"/>
+        <cmd id="ROYAL"/>
+        <cmd id="HOLD"/>
+        <cmd id="RECALL"/>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
 </nodeDefs>
