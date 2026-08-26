@@ -10,11 +10,11 @@
   </editor>
 
   <editor id="percent">
-    <range uom="51" min="0" max="100" step="0.1"/>
+    <range uom="51" min="0" max="100" step="1"/>
   </editor>
 
   <editor id="rawdecimal">
-    <range uom="56" min="0" max="10000" step="0.01"/>
+    <range uom="56" min="0" max="10000" step="1"/>
   </editor>
 
   <editor id="rawint">
