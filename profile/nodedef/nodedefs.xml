@@ -80,13 +80,21 @@
     <sts>
       <st id="ST" editor="onoff"/>
       <st id="CLITEMP" editor="tempf"/>
-      <st id="GV11" editor="rawint"/>
+      <st id="GV28" editor="tempf"/>
+      <st id="GV29" editor="heatsource"/>
+      <st id="GV30" editor="heatingstatus"/>
     </sts>
     <cmds>
       <sends/>
       <accepts>
         <cmd id="ON"/>
         <cmd id="OFF"/>
+        <cmd id="SET_HEAT_TEMP">
+          <p id="value" editor="heattemp" init="GV28"/>
+        </cmd>
+        <cmd id="SET_HEAT_SOURCE">
+          <p id="value" editor="heatsource" init="GV29"/>
+        </cmd>
         <cmd id="QUERY"/>
       </accepts>
     </cmds>
@@ -139,6 +147,12 @@
     <cmds>
       <sends/>
       <accepts>
+        <cmd id="SET_PH">
+          <p id="value" editor="phsetpoint"/>
+        </cmd>
+        <cmd id="SET_ORP">
+          <p id="value" editor="orpsetpoint" init="GV19"/>
+        </cmd>
         <cmd id="QUERY"/>
       </accepts>
     </cmds>
@@ -200,6 +214,25 @@
         <cmd id="ROYAL"/>
         <cmd id="HOLD"/>
         <cmd id="RECALL"/>
+        <cmd id="QUERY"/>
+      </accepts>
+    </cmds>
+  </nodeDef>
+
+
+  <nodeDef id="pentairicpumpcirc" nls="pentairicpumpcirc">
+    <sts>
+      <st id="GV31" editor="pumptarget"/>
+      <st id="GV32" editor="pumpselect"/>
+    </sts>
+    <cmds>
+      <sends/>
+      <accepts>
+        <cmd id="RPM_MODE"/>
+        <cmd id="GPM_MODE"/>
+        <cmd id="SET_PUMP_TARGET">
+          <p id="value" editor="pumpvalue"/>
+        </cmd>
         <cmd id="QUERY"/>
       </accepts>
     </cmds>

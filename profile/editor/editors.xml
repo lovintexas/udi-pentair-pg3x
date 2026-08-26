@@ -49,4 +49,41 @@
     <range uom="25" subset="0-13" nls="ICLIGHTMODE"/>
   </editor>
 
+
+  <editor id="heatsource">
+    <range uom="25" subset="1-5" nls="HEATSOURCE"/>
+  </editor>
+
+  <editor id="heatingstatus">
+    <range uom="25" subset="0-5" nls="HEATINGSTATUS"/>
+  </editor>
+
+
+  <editor id="heattemp">
+    <range uom="17" min="40" max="104" step="1"/>
+  </editor>
+
+
+  <editor id="pumptarget">
+    <range uom="56" min="0" max="5000" step="1"/>
+  </editor>
+
+  <editor id="pumpselect">
+    <range uom="25" subset="0-1" nls="PUMPSELECT"/>
+  </editor>
+
+
+  <editor id="pumpvalue">
+    <range uom="56" min="20" max="3450" step="1"/>
+  </editor>
+
+
+  <editor id="phsetpoint">
+    <range uom="25" subset="70-76" nls="PHSETPOINT"/>
+  </editor>
+
+  <editor id="orpsetpoint">
+    <range uom="56" min="400" max="800" step="1"/>
+  </editor>
+
 </editors>

@@ -1248,7 +1248,124 @@ class IntelliCenterChemNode(udi_interface.Node):
     def query(self, command=None):
         self.controller.query_intellicenter_object(self.objnam)
 
-    commands = {"QUERY": query}
+    def _send_chem_config(self, changed_key, changed_value):
+        required = (
+            "SNAME",
+            "SUBTYP",
+            "BODY",
+            "COMUART",
+            "PHSET",
+            "ORPSET",
+            "ALK",
+            "CALC",
+            "CYACID",
+            "PHTNKEN",
+        )
+
+        params = {}
+
+        for key in required:
+            value = self.params.get(key)
+
+            if value is None:
+                LOGGER.error(
+                    f"Cannot update IntelliChem: "
+                    f"missing {key}"
+                )
+                return
+
+            params[key] = str(value)
+
+        params[changed_key] = str(changed_value)
+
+        LOGGER.info(
+            f"Setting {self.name} "
+            f"{changed_key}={changed_value}"
+        )
+
+        self.controller.set_intellicenter_params(
+            self.objnam,
+            params
+        )
+
+    def cmd_set_ph(self, command):
+        try:
+            query = command.get("query", {})
+
+            raw_value = (
+                query.get("value.uom25")
+                or query.get("value.uom56")
+                or query.get("value")
+                or command.get("value")
+            )
+
+            if raw_value is None:
+                LOGGER.error(
+                    f"No pH setpoint in command: {command}"
+                )
+                return
+
+            raw_num = int(round(float(raw_value)))
+
+            if not 70 <= raw_num <= 76:
+                LOGGER.error(
+                    f"pH setpoint {raw_num} outside "
+                    f"70-76 tenths; command not sent"
+                )
+                return
+
+            value = raw_num / 10.0
+
+            self._send_chem_config(
+                "PHSET",
+                f"{value:.1f}"
+            )
+
+        except Exception as err:
+            LOGGER.error(
+                f"Error setting {self.name} pH: {err}"
+            )
+
+    def cmd_set_orp(self, command):
+        try:
+            query = command.get("query", {})
+
+            raw_value = (
+                query.get("value.uom56")
+                or query.get("value")
+                or command.get("value")
+            )
+
+            if raw_value is None:
+                LOGGER.error(
+                    f"No ORP setpoint in command: {command}"
+                )
+                return
+
+            value = int(round(float(raw_value)))
+
+            if not 400 <= value <= 800:
+                LOGGER.error(
+                    f"ORP setpoint {value} outside "
+                    f"400-800; command not sent"
+                )
+                return
+
+            self._send_chem_config(
+                "ORPSET",
+                value
+            )
+
+        except Exception as err:
+            LOGGER.error(
+                f"Error setting {self.name} ORP: {err}"
+            )
+
+    commands = {
+        "QUERY": query,
+        "SET_PH": cmd_set_ph,
+        "SET_ORP": cmd_set_orp,
+    }
 
 
 class IntelliCenterChlorNode(udi_interface.Node):
@@ -1377,7 +1494,9 @@ class IntelliCenterBodyNode(udi_interface.Node):
     drivers = [
         {"driver": "ST", "value": 0, "uom": 25},
         {"driver": "CLITEMP", "value": 0, "uom": 17},
-        {"driver": "GV11", "value": 0, "uom": 56},
+        {"driver": "GV28", "value": 0, "uom": 17},
+        {"driver": "GV29", "value": 1, "uom": 25},
+        {"driver": "GV30", "value": 0, "uom": 25},
     ]
 
     def __init__(
@@ -1421,10 +1540,24 @@ class IntelliCenterBodyNode(udi_interface.Node):
             except Exception:
                 pass
 
+        lotmp = self.params.get("LOTMP")
+        if lotmp is not None:
+            try:
+                self.setDriver("GV28", float(lotmp))
+            except Exception:
+                pass
+
+        mode = self.params.get("MODE")
+        if mode is not None:
+            try:
+                self.setDriver("GV29", int(mode))
+            except Exception:
+                pass
+
         htmode = self.params.get("HTMODE")
         if htmode is not None:
             try:
-                self.setDriver("GV11", int(htmode))
+                self.setDriver("GV30", int(htmode))
             except Exception:
                 pass
 
@@ -1447,10 +1580,246 @@ class IntelliCenterBodyNode(udi_interface.Node):
             "OFF"
         )
 
+    def cmd_set_heat_temp(self, command):
+        try:
+            query = command.get("query", {})
+
+            raw_value = (
+                query.get("value.uom17")
+                or query.get("value")
+                or command.get("value")
+            )
+
+            if raw_value is None:
+                LOGGER.error(
+                    f"No heat temperature value in command: {command}"
+                )
+                return
+
+            value = int(round(float(raw_value)))
+            value = max(40, min(104, value))
+
+            LOGGER.info(
+                f"Setting {self.name} heat setpoint to {value}F"
+            )
+
+            self.controller.set_intellicenter_param(
+                self.objnam,
+                "LOTMP",
+                str(value)
+            )
+
+        except Exception as err:
+            LOGGER.error(
+                f"Error setting {self.name} heat setpoint: {err}"
+            )
+
+    def cmd_set_heat_source(self, command):
+        try:
+            query = command.get("query", {})
+
+            raw_value = (
+                query.get("value.uom25")
+                or query.get("value")
+                or command.get("value")
+            )
+
+            if raw_value is None:
+                LOGGER.error(
+                    f"No heat source value in command: {command}"
+                )
+                return
+
+            value = int(float(raw_value))
+            value = max(1, min(5, value))
+
+            LOGGER.info(
+                f"Setting {self.name} heat source to {value}"
+            )
+
+            self.controller.set_intellicenter_param(
+                self.objnam,
+                "MODE",
+                str(value)
+            )
+
+        except Exception as err:
+            LOGGER.error(
+                f"Error setting {self.name} heat source: {err}"
+            )
+
     commands = {
         "QUERY": query,
         "ON": cmd_on,
         "OFF": cmd_off,
+        "SET_HEAT_TEMP": cmd_set_heat_temp,
+        "SET_HEAT_SOURCE": cmd_set_heat_source,
+    }
+
+
+
+class IntelliCenterPumpCircuitNode(udi_interface.Node):
+    id = "pentairicpumpcirc"
+
+    drivers = [
+        {"driver": "GV31", "value": 0, "uom": 56},
+        {"driver": "GV32", "value": 0, "uom": 25},
+    ]
+
+    def __init__(
+        self,
+        polyglot,
+        primary,
+        address,
+        name,
+        controller,
+        objnam,
+        parent_objnam=None,
+        circuit_objnam=None
+    ):
+        super().__init__(
+            polyglot,
+            primary,
+            address,
+            name
+        )
+
+        self.controller = controller
+        self.objnam = objnam
+        self.parent_objnam = parent_objnam
+        self.circuit_objnam = circuit_objnam
+        self.params = {}
+        self.pending_select = None
+
+    def update_from_params(self, params):
+        if not params:
+            return
+
+        self.params.update(params)
+
+        if self.params.get("PARENT"):
+            self.parent_objnam = self.params.get("PARENT")
+
+        if self.params.get("CIRCUIT"):
+            self.circuit_objnam = self.params.get("CIRCUIT")
+
+        speed = self.params.get("SPEED")
+
+        if speed is not None:
+            try:
+                self.setDriver(
+                    "GV31",
+                    float(speed)
+                )
+            except Exception:
+                pass
+
+        select = str(
+            self.params.get("SELECT", "")
+        ).upper()
+
+        if select == "RPM":
+            self.setDriver("GV32", 0)
+            self.pending_select = "RPM"
+        elif select == "GPM":
+            self.setDriver("GV32", 1)
+            self.pending_select = "GPM"
+    def query(self, command=None):
+        self.controller.query_intellicenter_object(
+            self.objnam
+        )
+
+    def cmd_rpm_mode(self, command=None):
+        self.pending_select = "RPM"
+
+        self.setDriver("GV32", 0)
+        self.setDriver("GV31", 0)
+
+        LOGGER.info(
+            f"{self.name} pending mode set to RPM"
+        )
+
+    def cmd_gpm_mode(self, command=None):
+        self.pending_select = "GPM"
+
+        self.setDriver("GV32", 1)
+        self.setDriver("GV31", 0)
+
+        LOGGER.info(
+            f"{self.name} pending mode set to GPM"
+        )
+
+    def cmd_set_target(self, command):
+        try:
+            query = command.get("query", {})
+
+            raw_value = (
+                query.get("value.uom56")
+                or query.get("value")
+                or command.get("value")
+            )
+
+            if raw_value is None:
+                LOGGER.error(
+                    f"No pump target value in command: {command}"
+                )
+                return
+
+            value = int(round(float(raw_value)))
+
+            select = (
+                self.pending_select
+                or str(
+                    self.params.get("SELECT", "RPM")
+                ).upper()
+            )
+
+            if select == "RPM":
+                if not 450 <= value <= 3450:
+                    LOGGER.error(
+                        f"RPM target {value} is outside "
+                        f"450-3450; command not sent"
+                    )
+                    return
+
+            elif select == "GPM":
+                if not 20 <= value <= 140:
+                    LOGGER.error(
+                        f"GPM target {value} is outside "
+                        f"20-140; command not sent"
+                    )
+                    return
+
+            else:
+                LOGGER.error(
+                    f"Unknown pump mode {select}; "
+                    f"command not sent"
+                )
+                return
+
+            LOGGER.info(
+                f"Setting {self.name} to "
+                f"{value} {select}"
+            )
+
+            self.controller.set_intellicenter_params(
+                self.objnam,
+                {
+                    "SPEED": str(value),
+                    "SELECT": select,
+                }
+            )
+
+        except Exception as err:
+            LOGGER.error(
+                f"Error setting {self.name} target: {err}"
+            )
+
+    commands = {
+        "QUERY": query,
+        "RPM_MODE": cmd_rpm_mode,
+        "GPM_MODE": cmd_gpm_mode,
+        "SET_PUMP_TARGET": cmd_set_target,
     }
 
 
@@ -1571,6 +1940,13 @@ class Controller(udi_interface.Node):
         self.ic_chlor = {}
         self.ic_circuits = {}
         self.ic_lights = {}
+        self.ic_pumpcircs = {}
+
+        # Metadata for every IntelliCenter CIRCUIT object,
+        # including Pool/Spa/internal circuits that may not
+        # become their own IoX nodes.  PMPCIRC uses this to
+        # resolve CIRCUIT IDs to friendly names.
+        self.ic_circuit_info = {}
 
         self.ic_listener_thread = None
         self.ic_listener_stop = threading.Event()
@@ -1674,6 +2050,12 @@ class Controller(udi_interface.Node):
 
         if not objnam:
             return
+
+        info = self.ic_circuit_info.setdefault(
+            objnam,
+            {}
+        )
+        info.update(params)
 
         name = str(
             params.get("SNAME", "")
@@ -1922,6 +2304,71 @@ class Controller(udi_interface.Node):
 
         node.update_from_params(params)
 
+    def add_ic_pumpcirc(self, obj):
+        objnam = obj.get("objnam")
+        params = obj.get("params", {}) or {}
+
+        if not objnam:
+            return
+
+        parent = params.get("PARENT")
+        circuit = params.get("CIRCUIT")
+
+        address = make_address(
+            "q",
+            "intellicenter:" + objnam
+        )
+
+        node = self.ic_pumpcircs.get(address)
+
+        if node is None:
+            # Resolve the friendly circuit name dynamically.
+            circuit_info = (
+                self.ic_circuit_info.get(circuit, {})
+                if circuit else {}
+            )
+
+            circuit_name = (
+                circuit_info.get("SNAME")
+                or circuit
+                or objnam
+            )
+
+            # Resolve the parent pump's friendly name.
+            pump_name = parent
+
+            for pump_node in self.ic_pumps.values():
+                if pump_node.objnam == parent:
+                    pump_name = pump_node.name
+                    break
+
+            if pump_name:
+                name = f"{circuit_name} - {pump_name}"
+            else:
+                name = f"{circuit_name} Pump Speed"
+
+            node = IntelliCenterPumpCircuitNode(
+                polyglot,
+                self.address,
+                address,
+                name,
+                self,
+                objnam,
+                parent,
+                circuit
+            )
+
+            self.ic_pumpcircs[address] = node
+            polyglot.addNode(node)
+
+            LOGGER.info(
+                f"Added IntelliCenter pump assignment: "
+                f"{name} ({objnam}, "
+                f"parent={parent}, circuit={circuit})"
+            )
+
+        node.update_from_params(params)
+
     def add_ic_pump(self, obj):
         objnam = obj.get("objnam")
         params = obj.get("params", {}) or {}
@@ -1968,6 +2415,10 @@ class Controller(udi_interface.Node):
                 return node
 
         for node in self.ic_pumps.values():
+            if node.objnam == objnam:
+                return node
+
+        for node in self.ic_pumpcircs.values():
             if node.objnam == objnam:
                 return node
 
@@ -2018,7 +2469,14 @@ class Controller(udi_interface.Node):
                         "HTMODE",
                         "RPM",
                         "GPM",
-                        "PWR"
+                        "PWR",
+                        "PARENT",
+                        "BODY",
+                        "CIRCUIT",
+                        "LISTORD",
+                        "SPEED",
+                        "SELECT",
+                        "STATIC"
                     ]
                 }
             ],
@@ -2077,15 +2535,48 @@ class Controller(udi_interface.Node):
 
 
     def handle_intellicenter_message(self, message):
-        if message.get("command") != "NotifyList":
+        command = message.get("command")
+
+        updates = []
+
+        if command == "NotifyList":
+            updates = (
+                message.get("objectList", [])
+                or []
+            )
+
+        elif command == "WriteParamList":
+            for wrapper in (
+                message.get("objectList", [])
+                or []
+            ):
+                updates.extend(
+                    wrapper.get("changes", [])
+                    or []
+                )
+
+        else:
             return
 
-        for obj in message.get("objectList", []):
+        for obj in updates:
             objnam = obj.get("objnam")
             params = obj.get("params", {}) or {}
 
             if not objnam or not params:
                 continue
+
+            # Preserve CIRCUIT metadata even when the CIRCUIT
+            # itself is intentionally not exposed as a node.
+            objtyp = str(
+                params.get("OBJTYP", "")
+            ).upper()
+
+            if objtyp == "CIRCUIT":
+                info = self.ic_circuit_info.setdefault(
+                    objnam,
+                    {}
+                )
+                info.update(params)
 
             node = self.get_ic_node_by_objnam(
                 objnam
@@ -2100,6 +2591,11 @@ class Controller(udi_interface.Node):
                 node.update_from_params(
                     params
                 )
+
+            elif objtyp == "PMPCIRC":
+                # Allows a newly-created pump assignment to
+                # appear without restarting the plugin.
+                self.add_ic_pumpcirc(obj)
 
     def intellicenter_listener(self):
         LOGGER.info(
@@ -2251,14 +2747,6 @@ class Controller(udi_interface.Node):
                 ]
             ),
             (
-                "PMPCIRC",
-                "OBJTYP=PMPCIRC",
-                [
-                    "OBJNAM", "OBJTYP", "BODY",
-                    "CIRCUIT", "SPEED", "SELECT"
-                ]
-            ),
-            (
                 "CIRCUIT",
                 "OBJTYP = CIRCUIT",
                 [
@@ -2268,11 +2756,21 @@ class Controller(udi_interface.Node):
                 ]
             ),
             (
+                "PMPCIRC",
+                "OBJTYP=PMPCIRC",
+                [
+                    "OBJNAM", "OBJTYP", "PARENT",
+                    "BODY", "CIRCUIT", "LISTORD",
+                    "SPEED", "SELECT", "STATIC"
+                ]
+            ),
+            (
                 "BODY",
                 "OBJTYP = BODY",
                 [
                     "OBJNAM", "OBJTYP", "SUBTYP",
                     "SNAME", "STATUS", "TEMP",
+                    "LOTMP", "MODE",
                     "FILTER", "HEATER", "HTSRC",
                     "HTMODE"
                 ]
@@ -2301,7 +2799,9 @@ class Controller(udi_interface.Node):
                 "OBJTYP = CHEM",
                 [
                     "OBJNAM", "OBJTYP", "SUBTYP",
-                    "SNAME", "PHVAL", "ORPVAL",
+                    "SNAME", "BODY",
+                    "COMUART", "PHTNKEN",
+                    "PHVAL", "ORPVAL",
                     "SALT", "ALK", "CALC",
                     "CYACID", "PHSET", "ORPSET",
                     "PRIM", "SEC", "SUPER"
@@ -2335,6 +2835,9 @@ class Controller(udi_interface.Node):
 
                     elif label == "PUMP":
                         self.add_ic_pump(obj)
+
+                    elif label == "PMPCIRC":
+                        self.add_ic_pumpcirc(obj)
 
                     elif label == "HEATER":
                         self.add_ic_heater(obj)
