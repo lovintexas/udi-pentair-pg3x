@@ -2270,20 +2270,11 @@ class Controller(udi_interface.Node):
         node = self.ic_bodies.get(address)
 
         if node is None:
-            subtype = str(
-                params.get("SUBTYP", "")
-            ).upper()
-
-            if subtype == "POOL":
-                name = "Pool"
-            elif subtype == "SPA":
-                name = "Spa"
-            else:
-                name = (
-                    params.get("SNAME")
-                    or params.get("SUBTYP")
-                    or objnam
-                )
+            name = (
+                params.get("SNAME")
+                or params.get("SUBTYP")
+                or objnam
+            )
 
             node = IntelliCenterBodyNode(
                 polyglot,
@@ -2342,10 +2333,7 @@ class Controller(udi_interface.Node):
                     pump_name = pump_node.name
                     break
 
-            if pump_name:
-                name = f"{circuit_name} - {pump_name}"
-            else:
-                name = f"{circuit_name} Pump Speed"
+            name = f"{circuit_name} - Pump Speed"
 
             node = IntelliCenterPumpCircuitNode(
                 polyglot,

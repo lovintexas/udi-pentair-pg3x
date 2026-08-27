@@ -41,7 +41,7 @@
 
 
   <editor id="tempf">
-    <range uom="17" min="-50" max="150" step="0.1"/>
+    <range uom="17" min="-50" max="150" step="1"/>
   </editor>
 
 
