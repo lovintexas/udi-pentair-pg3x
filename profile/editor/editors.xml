@@ -86,4 +86,9 @@
     <range uom="56" min="400" max="800" step="1"/>
   </editor>
 
+
+  <editor id="activeprogram">
+    <range uom="25" subset="0-8" nls="ACTIVEPROGRAM"/>
+  </editor>
+
 </editors>

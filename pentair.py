@@ -17,7 +17,7 @@ import websocket
 
 
 LOGGER = udi_interface.LOGGER
-VERSION = "1.1.3"
+VERSION = "1.1.4"
 
 polyglot = udi_interface.Interface([])
 controller = None
@@ -350,7 +350,7 @@ class PumpNode(udi_interface.Node):
         {"driver": "GV3", "value": 0, "uom": 56},
         {"driver": "GV4", "value": 0, "uom": 56},
         {"driver": "GV5", "value": 0, "uom": 56},
-        {"driver": "GV6", "value": 0, "uom": 56},
+        {"driver": "GV6", "value": 0, "uom": 25},
     ]
 
     def __init__(
@@ -418,10 +418,12 @@ class PumpNode(udi_interface.Node):
 
         running_raw = field_value(fields, "s14")
 
-        running_program = 100
+        running_program = 0
 
         if running_raw is not None:
-            running_program = int(running_raw) + 1
+            raw_program = int(running_raw)
+            if 0 <= raw_program <= 7:
+                running_program = raw_program + 1
 
         self.setDriver(
             "GV6",

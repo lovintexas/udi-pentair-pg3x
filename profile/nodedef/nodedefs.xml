@@ -21,7 +21,7 @@
       <st id="GV3" editor="rawdecimal"/>
       <st id="GV4" editor="rawdecimal"/>
       <st id="GV5" editor="rawint"/>
-      <st id="GV6" editor="rawint"/>
+      <st id="GV6" editor="activeprogram"/>
     </sts>
     <cmds>
       <sends/>
