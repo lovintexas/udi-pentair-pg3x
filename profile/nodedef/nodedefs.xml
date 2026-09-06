@@ -197,8 +197,8 @@
     <cmds>
       <sends/>
       <accepts>
-        <cmd id="ON"/>
-        <cmd id="OFF"/>
+        <cmd id="DON"/>
+        <cmd id="DOF"/>
         <cmd id="WHITE"/>
         <cmd id="GREEN"/>
         <cmd id="BLUE"/>

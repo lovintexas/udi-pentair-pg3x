@@ -1095,8 +1095,8 @@ class IntelliCenterLightNode(udi_interface.Node):
 
     commands = {
         "QUERY": query,
-        "ON": cmd_on,
-        "OFF": cmd_off,
+        "DON": cmd_on,
+        "DOF": cmd_off,
         "WHITE": cmd_white,
         "GREEN": cmd_green,
         "BLUE": cmd_blue,
