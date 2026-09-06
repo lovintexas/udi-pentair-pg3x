@@ -47,15 +47,14 @@
 
   <nodeDef id="pentaircolorsync" nls="pentaircolorsync">
     <sts>
-      <st id="ST" editor="connectionstate"/>
-      <st id="GV1" editor="onoff"/>
+      <st id="ST" editor="onoff"/>
       <st id="GV7" editor="colorsyncmode"/>
     </sts>
     <cmds>
       <sends/>
       <accepts>
-        <cmd id="ON"/>
-        <cmd id="OFF"/>
+        <cmd id="DON"/>
+        <cmd id="DOF"/>
         <cmd id="RED"/>
         <cmd id="WHITE"/>
         <cmd id="MAGENTA"/>

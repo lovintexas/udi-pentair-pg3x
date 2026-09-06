@@ -511,7 +511,6 @@ class ColorSyncNode(udi_interface.Node):
 
     drivers = [
         {"driver": "ST",  "value": 0, "uom": 25},
-        {"driver": "GV1", "value": 0, "uom": 25},
         {"driver": "GV7", "value": 0, "uom": 25},
     ]
 
@@ -550,30 +549,15 @@ class ColorSyncNode(udi_interface.Node):
         self.device_id = device_id
 
     def update_from_device(self, device):
-        online = device.get("online")
-
-        if online is not None:
-            self.setDriver(
-                "ST",
-                1 if online else 0
-            )
+        pass
 
     def update_from_response(self, device_response):
         fields = device_response.get("fields", {})
 
-        online = device_response.get("online")
-        if online is not None:
-            self.setDriver(
-                "ST",
-                1 if online else 0
-            )
-
         power = field_value(fields, "d13")
         if power is not None:
-            self.setDriver(
-                "GV1",
-                int(power)
-            )
+            power_value = int(power)
+            self.setDriver("ST", power_value)
 
         mode = field_value(fields, "s8")
         if mode is None:
@@ -602,10 +586,8 @@ class ColorSyncNode(udi_interface.Node):
             )
 
             # Immediately reflect the commanded state in IoX.
-            self.setDriver(
-                "GV1",
-                1 if on else 0
-            )
+            power_value = 1 if on else 0
+            self.setDriver("ST", power_value)
 
         except Exception as err:
             LOGGER.error(
@@ -682,8 +664,8 @@ class ColorSyncNode(udi_interface.Node):
             controller.query()
 
     commands = {
-        "ON": power_on,
-        "OFF": power_off,
+        "DON": power_on,
+        "DOF": power_off,
         "RED": red,
         "WHITE": white,
         "MAGENTA": magenta,
