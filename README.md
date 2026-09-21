@@ -2,6 +2,12 @@
 
 A Universal Devices eisy / PG3x plugin for supported Pentair connected pool equipment.
 
+## Documentation
+
+Full documentation and setup guide:
+
+https://lovintexas.github.io/udi-pentair-pg3x/
+
 ## Currently Supported
 
 ### IntelliFlo3 / IntelliFlo Pro3 VSF
@@ -36,6 +42,24 @@ A Universal Devices eisy / PG3x plugin for supported Pentair connected pool equi
 - Royal
 
 Color Sync commands update IoX immediately after the Pentair command is accepted. Normal polling later confirms the actual device state.
+
+### IntelliCenter
+- Automatic discovery of IntelliCenter equipment
+- Pool and spa body status and temperature
+- Pool and spa On / Off control
+- Heat setpoint control
+- Heat source selection
+- IntelliCenter pump status and control
+- Automatic discovery of pump circuit assignments
+- RPM / GPM mode selection and rate control for pump assignments
+- Heater status and control
+- IntelliChem pH, ORP, salt, alkalinity, calcium, and CYA monitoring
+- IntelliChem pH and ORP setpoint control
+- IntelliChlor salt level, output, and Super Chlorinate status
+- Auxiliary/circuit On / Off control
+- IntelliCenter color-light On / Off control
+- Color and light-show selection
+- Hold and Recall light commands
 
 ## Configuration
 
