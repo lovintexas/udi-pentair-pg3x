@@ -1,0 +1,37 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pentair PG3x Plugin</title>
+<style>
+:root{--bg:#f5f7fa;--card:#fff;--ink:#172033;--muted:#5e6b7a;--line:#dfe5ec;--hero:#10243d;--accent:#2f6f9f}*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}.hero{background:var(--hero);color:#fff;padding:52px 22px 46px}.wrap{max-width:1040px;margin:auto}h1{margin:0 0 10px;font-size:clamp(2rem,5vw,3.3rem)}.subtitle{max-width:760px;color:#dbe7f3;font-size:1.08rem}.badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.badge{border:1px solid #66819e;border-radius:999px;padding:5px 10px;font-size:.86rem}main{padding:28px 18px 48px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px;box-shadow:0 1px 3px #0001}.grid .card{margin-bottom:0}h2{margin:0 0 12px;font-size:1.35rem}h3{margin:18px 0 8px}p{margin:8px 0 12px}ul{margin:8px 0 8px 22px;padding:0}li{margin:5px 0}code{background:#eef2f6;border-radius:4px;padding:2px 5px}.note{background:#f0f6fa;border-left:4px solid var(--accent);padding:12px 14px;border-radius:4px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--line);padding:10px 8px}th{background:#f7f9fb}footer{color:var(--muted);text-align:center;padding:0 18px 35px;font-size:.9rem}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+</style></head><body>
+<header class="hero"><div class="wrap"><h1>Pentair PG3x Plugin</h1><p class="subtitle">A Universal Devices eisy / PG3x plugin for supported Pentair connected pool equipment.</p><div class="badges"><span class="badge">Pentair Cloud</span><span class="badge">PG3x</span><span class="badge">IoX</span><span class="badge">Automatic Discovery</span></div></div></header>
+<main class="wrap">
+<section class="card"><h2>Overview</h2><p>The plugin connects to the same Pentair Cloud account used by the Pentair Pool phone app and automatically discovers supported connected equipment associated with the account.</p></section>
+<div class="grid">
+<section class="card"><h2>IntelliFlo3 / IntelliFlo Pro3 VSF</h2><p>Pentair device type <code>IF31</code>.</p><ul><li>Online / connection status</li><li>Power</li><li>Motor speed</li><li>Flow</li><li>Pressure</li><li>Alarm status</li><li>Active program</li><li>Automatic discovery of configured pump programs</li><li>Start / Stop pump programs</li><li>Immediate Running / Idle feedback after commands</li></ul><p>Each enabled pump program is discovered automatically and appears as its own IoX node.</p></section>
+<section class="card"><h2>Color Sync</h2><p>Pentair device type <code>PLC1</code>.</p><ul><li>Online / connection status</li><li>On / Off</li><li>Current color or light show</li><li>Red, White, Magenta, Green, Blue</li><li>Hold and Recall</li><li>SAm, Party, Romance, Caribbean, American, Sunset and Royal</li></ul><p>Color Sync commands update IoX immediately after the Pentair command is accepted. Normal polling later confirms the actual device state.</p></section>
+</div>
+<section class="card"><h2>IntelliCenter</h2>
+<p>The plugin automatically discovers supported equipment connected through Pentair IntelliCenter and creates the appropriate IoX nodes.</p>
+<ul>
+<li>Automatic discovery of IntelliCenter equipment</li>
+<li>Pool and spa body status and temperature</li>
+<li>Pool and spa On / Off control</li>
+<li>Heat setpoint control</li>
+<li>Heat source selection</li>
+<li>IntelliCenter pump status and control</li>
+<li>Automatic discovery of pump circuit assignments</li>
+<li>RPM / GPM mode selection and rate control for pump assignments</li>
+<li>Heater status and control</li>
+<li>IntelliChem pH, ORP, salt, alkalinity, calcium, and CYA monitoring</li>
+<li>IntelliChem pH and ORP setpoint control</li>
+<li>IntelliChlor salt level, output, and Super Chlorinate status</li>
+<li>Auxiliary/circuit On / Off control</li>
+<li>IntelliCenter color-light On / Off control</li>
+<li>Color and light-show selection</li>
+<li>Hold and Recall light commands</li>
+</ul>
+</section>
+<section class="card"><h2>Configuration</h2><p>Enter your Pentair Pool account credentials in the PG3x Custom Parameters:</p><table><thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody><tr><td><code>username</code></td><td>Your Pentair account email address</td></tr><tr><td><code>password</code></td><td>Your Pentair account password</td></tr></tbody></table><p>After entering both values, click <strong>Save</strong>. The plugin will authenticate with Pentair Cloud and automatically discover supported equipment associated with the account.</p></section>
+<section class="card"><h2>Other Pentair Equipment</h2><p>Pentair accounts may contain other connected device types. Unknown devices may be discovered and logged, but they are not added to IoX until support for that device type has been implemented and tested.</p></section>
+<section class="card"><h2>Security</h2><p>Your Pentair username and password are used to authenticate with Pentair Cloud.</p><p class="note"><strong>Important:</strong> Do not include your password, authentication tokens, or device identifiers in screenshots, forum posts, logs, or support requests.</p></section>
+<section class="card"><h2>Project Note</h2><p>This project is not affiliated with or endorsed by Pentair.</p></section>
+</main><footer>Pentair PG3x Plugin documentation. Pentair product names and trademarks belong to their respective owners.</footer></body></html>
