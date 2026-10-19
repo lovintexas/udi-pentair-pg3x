@@ -17,7 +17,7 @@ import websocket
 
 
 LOGGER = udi_interface.LOGGER
-VERSION = "1.1.5"
+VERSION = "1.1.6"
 
 polyglot = udi_interface.Interface([])
 controller = None
@@ -2825,6 +2825,20 @@ class Controller(udi_interface.Node):
                     f"IntelliCenter {label} discovery "
                     f"failed: {err}"
                 )
+
+        # Republish cached IntelliCenter status values to IoX.
+        for collection in (
+            self.ic_bodies,
+            self.ic_pumps,
+            self.ic_heaters,
+            self.ic_chem,
+            self.ic_chlor,
+            self.ic_circuits,
+            self.ic_lights,
+            self.ic_pumpcircs,
+        ):
+            for node in collection.values():
+                node.reportDrivers()
 
         self.start_intellicenter_listener()
 
