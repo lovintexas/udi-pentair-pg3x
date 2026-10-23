@@ -2057,7 +2057,7 @@ class Controller(udi_interface.Node):
         # object type but SUBTYP=INTELLI.  Give them the
         # dedicated color/show node instead of a generic
         # On/Off circuit.
-        if subtype == "INTELLI":
+        if subtype in ("INTELLI", "GLOW"):
             address = make_address(
                 "l",
                 "intellicenter:" + objnam
