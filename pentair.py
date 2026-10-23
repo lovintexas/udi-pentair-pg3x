@@ -1399,7 +1399,93 @@ class IntelliCenterChlorNode(udi_interface.Node):
     def query(self, command=None):
         self.controller.query_intellicenter_object(self.objnam)
 
-    commands = {"QUERY": query}
+    def cmd_set_pool_output(self, command):
+        try:
+            query = command.get("query", {})
+            raw = query.get("value.uom51")
+
+            if raw is None:
+                raw = query.get("value")
+            if raw is None:
+                raw = command.get("value")
+
+            value = float(raw)
+
+            if not value.is_integer():
+                raise ValueError("Percentage must be an integer")
+
+            value = int(value)
+
+            if not 0 <= value <= 100 or value % 5 != 0:
+                raise ValueError(
+                    "Pool output must be 0-100 in 5% increments"
+                )
+
+            LOGGER.info(
+                f"Setting {self.name} pool output to {value}%"
+            )
+
+            self.controller.set_intellicenter_param(
+                self.objnam, "PRIM", str(value)
+            )
+
+        except Exception as err:
+            LOGGER.error(
+                f"Error setting IntelliChlor pool output: {err}"
+            )
+
+    def cmd_set_spa_output(self, command):
+        try:
+            query = command.get("query", {})
+            raw = query.get("value.uom51")
+
+            if raw is None:
+                raw = query.get("value")
+            if raw is None:
+                raw = command.get("value")
+
+            value = float(raw)
+
+            if not value.is_integer():
+                raise ValueError("Percentage must be an integer")
+
+            value = int(value)
+
+            if not 0 <= value <= 100 or value % 5 != 0:
+                raise ValueError(
+                    "Spa output must be 0-100 in 5% increments"
+                )
+
+            LOGGER.info(
+                f"Setting {self.name} spa output to {value}%"
+            )
+
+            self.controller.set_intellicenter_param(
+                self.objnam, "SEC", str(value)
+            )
+
+        except Exception as err:
+            LOGGER.error(
+                f"Error setting IntelliChlor spa output: {err}"
+            )
+
+    def cmd_super_on(self, command=None):
+        self.controller.set_intellicenter_param(
+            self.objnam, "SUPER", "ON"
+        )
+
+    def cmd_super_off(self, command=None):
+        self.controller.set_intellicenter_param(
+            self.objnam, "SUPER", "OFF"
+        )
+
+    commands = {
+        "QUERY": query,
+        "SET_POOL_OUTPUT": cmd_set_pool_output,
+        "SET_SPA_OUTPUT": cmd_set_spa_output,
+        "SUPER_ON": cmd_super_on,
+        "SUPER_OFF": cmd_super_off,
+    }
 
 
 class IntelliCenterHeaterNode(udi_interface.Node):

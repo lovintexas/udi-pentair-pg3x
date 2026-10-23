@@ -168,6 +168,14 @@
     <cmds>
       <sends/>
       <accepts>
+        <cmd id="SET_POOL_OUTPUT">
+          <p id="value" editor="chlorpercent"/>
+        </cmd>
+        <cmd id="SET_SPA_OUTPUT">
+          <p id="value" editor="chlorpercent"/>
+        </cmd>
+        <cmd id="SUPER_ON"/>
+        <cmd id="SUPER_OFF"/>
         <cmd id="QUERY"/>
       </accepts>
     </cmds>

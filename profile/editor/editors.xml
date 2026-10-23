@@ -12,6 +12,9 @@
   <editor id="percent">
     <range uom="51" min="0" max="100" step="1"/>
   </editor>
+  <editor id="chlorpercent">
+    <range uom="51" min="0" max="100" step="5"/>
+  </editor>
 
   <editor id="rawdecimal">
     <range uom="56" min="0" max="10000" step="1"/>
