@@ -55,9 +55,11 @@ Color Sync commands update IoX immediately after the Pentair command is accepted
 - Heater status and control
 - IntelliChem pH, ORP, salt, alkalinity, calcium, and CYA monitoring
 - IntelliChem pH and ORP setpoint control
-- IntelliChlor salt level, output, and Super Chlorinate status
+- IntelliChlor salt level, pool/spa output, and Super Chlorinate status
+- IntelliChlor pool and spa output control (0–100%, 5% increments)
+- IntelliChlor Super Chlorinate Start / Stop control
 - Auxiliary/circuit On / Off control
-- IntelliCenter color-light On / Off control
+- IntelliCenter IntelliBrite and GloBrite color-light On / Off control
 - Color and light-show selection
 - Hold and Recall light commands
 

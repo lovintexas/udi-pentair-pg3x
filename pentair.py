@@ -17,7 +17,7 @@ import websocket
 
 
 LOGGER = udi_interface.LOGGER
-VERSION = "1.1.6"
+VERSION = "1.1.7"
 
 polyglot = udi_interface.Interface([])
 controller = None
