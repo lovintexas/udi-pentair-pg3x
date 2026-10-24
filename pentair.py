@@ -6,6 +6,7 @@ import hashlib
 import threading
 import json
 import uuid
+import time
 
 import boto3
 import markdown2
@@ -2021,6 +2022,21 @@ class Controller(udi_interface.Node):
         self.ic_listener_thread = None
         self.ic_listener_stop = threading.Event()
 
+        # Periodic IntelliCenter status refresh
+        self.ic_last_refresh = time.monotonic()
+        self.ic_refresh_interval = 60
+
+        # IntelliCenter connection watchdog
+        self.ic_last_response = time.monotonic()
+        self.ic_missed_refreshes = 0
+        self.ic_watchdog_limit = 3
+        self.ic_pending_refresh = set()
+        self.ic_refresh_lock = threading.Lock()
+        self.ic_refresh_expected = 0
+        self.ic_refresh_started = False
+        self.ic_reconnect_requested = threading.Event()
+        self.ic_reconnecting = threading.Event()
+
     def configure(self, params):
         self.username = params.get("username")
         self.password = params.get("password")
@@ -2502,6 +2518,78 @@ class Controller(udi_interface.Node):
 
         return None
 
+    def refresh_intellicenter_status(self):
+        if not self.ic_listener_thread or not self.ic_listener_thread.is_alive():
+            return
+
+        if (
+            self.ic_reconnect_requested.is_set()
+            or self.ic_reconnecting.is_set()
+        ):
+            return
+
+        now = time.monotonic()
+        if now - self.ic_last_refresh < self.ic_refresh_interval:
+            return
+
+        self.ic_last_refresh = now
+
+        collections = (
+            self.ic_bodies,
+            self.ic_pumps,
+            self.ic_heaters,
+            self.ic_chem,
+            self.ic_chlor,
+            self.ic_circuits,
+            self.ic_lights,
+            self.ic_pumpcircs,
+        )
+
+        objnams = {
+            node.objnam
+            for collection in collections
+            for node in collection.values()
+        }
+
+        if not objnams:
+            return
+
+        with self.ic_refresh_lock:
+            if self.ic_refresh_started:
+                if len(self.ic_pending_refresh) == self.ic_refresh_expected:
+                    self.ic_missed_refreshes += 1
+                    LOGGER.warning(
+                        f"IntelliCenter refresh received no responses "
+                        f"({self.ic_missed_refreshes} consecutive misses)"
+                    )
+
+                    if self.ic_missed_refreshes >= self.ic_watchdog_limit:
+                        LOGGER.warning(
+                            "IntelliCenter watchdog: requesting reconnect"
+                        )
+                        self.ic_reconnect_requested.set()
+                else:
+                    self.ic_missed_refreshes = 0
+
+            self.ic_pending_refresh = set(objnams)
+            self.ic_refresh_expected = len(objnams)
+            self.ic_refresh_started = bool(objnams)
+
+        if self.ic_reconnect_requested.is_set():
+            return
+
+        LOGGER.info(
+            f"Refreshing {len(objnams)} IntelliCenter objects"
+        )
+
+        for objnam in sorted(objnams):
+            try:
+                self.query_intellicenter_object(objnam)
+            except Exception as err:
+                LOGGER.warning(
+                    f"IntelliCenter refresh failed for {objnam}: {err}"
+                )
+
     def query_intellicenter_object(self, objnam):
         if self.intellicenter.ws is None:
             return
@@ -2623,6 +2711,12 @@ class Controller(udi_interface.Node):
             if not objnam or not params:
                 continue
 
+            # A full parameter response indicates that an
+            # IntelliCenter status request was answered.
+            if "OBJNAM" in params and "OBJTYP" in params:
+                with self.ic_refresh_lock:
+                    self.ic_pending_refresh.discard(objnam)
+
             # Preserve CIRCUIT metadata even when the CIRCUIT
             # itself is intentionally not exposed as a node.
             objtyp = str(
@@ -2663,7 +2757,32 @@ class Controller(udi_interface.Node):
         while not self.ic_listener_stop.is_set():
 
             try:
-                self.intellicenter.ensure_connected()
+                if self.ic_reconnect_requested.is_set():
+                    self.ic_reconnecting.set()
+                    LOGGER.warning(
+                        "IntelliCenter watchdog requesting WebSocket reconnect"
+                    )
+                    self.intellicenter.close()
+
+                    with self.ic_refresh_lock:
+                        self.ic_pending_refresh.clear()
+                        self.ic_refresh_expected = 0
+                        self.ic_refresh_started = False
+                        self.ic_missed_refreshes = 0
+                        self.ic_last_refresh = time.monotonic()
+                        self.ic_reconnect_requested.clear()
+
+                if not self.intellicenter.ensure_connected():
+                    raise ConnectionError(
+                        "IntelliCenter WebSocket reconnect failed"
+                    )
+
+                if self.ic_reconnecting.is_set():
+                    self.ic_last_refresh = time.monotonic()
+                    self.ic_reconnecting.clear()
+                    LOGGER.info(
+                        "IntelliCenter watchdog reconnect completed"
+                    )
 
                 ws = self.intellicenter.ws
 
@@ -3193,6 +3312,7 @@ def poll_handler(poll_type):
 
     try:
         controller.query()
+        controller.refresh_intellicenter_status()
 
     finally:
         poll_lock.release()
